@@ -10,10 +10,21 @@ from collections.abc import Iterator, Sequence
 
 import typer
 from rich.console import Console
-from rich.progress import (BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn)
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from rich.table import Table
 
-app = typer.Typer(name="locc", help="Count lines of code in files and directories", add_completion=False, no_args_is_help=False)
+app = typer.Typer(
+    name="locc",
+    help="Count lines of code in files and directories",
+    add_completion=False,
+    no_args_is_help=False,
+)
 console = Console()
 
 DEFAULT_EXCLUDED_DIRS = {
@@ -25,18 +36,23 @@ DEFAULT_EXCLUDED_DIRS = {
     ".mypy_cache",
 }
 
+
 @dataclass
 class CountResult:
     """Result of counting a single file"""
+
     path: Path
     lines: int
+
 
 @dataclass
 class GroupStats:
     """Aggregated stats for a group (extension or filename)"""
+
     name: str
     lines: int
     file_count: int
+
 
 def is_excluded(name: str, patterns: Sequence[str]) -> bool:
     """check if a file/dir name should be excluded based on defaults and patterns"""
@@ -45,7 +61,7 @@ def is_excluded(name: str, patterns: Sequence[str]) -> bool:
         return True
     if name in DEFAULT_EXCLUDED_DIRS:
         return True
-    
+
     for pattern in patterns:
         if pattern.endswith("/"):
             if name == pattern.rstrip("/"):
@@ -54,13 +70,16 @@ def is_excluded(name: str, patterns: Sequence[str]) -> bool:
             return True
     return False
 
-def walk_directory(root: Path, patterns: Sequence[str], max_depth: int | None) -> Iterator[Path]:
+
+def walk_directory(
+    root: Path, patterns: Sequence[str], max_depth: int | None
+) -> Iterator[Path]:
     """Walk a directory yielding file paths, respecting exclusions and depth"""
 
     def _walk(current: Path, depth: int) -> Iterator[Path]:
         if max_depth is not None and depth > max_depth:
             return
-        
+
         try:
             entries = sorted(current.iterdir())
         except (PermissionError, OSError):
@@ -71,17 +90,21 @@ def walk_directory(root: Path, patterns: Sequence[str], max_depth: int | None) -
                 continue
             if entry.is_symlink():
                 continue
-            
+
             try:
                 if entry.is_dir():
                     yield from _walk(entry, depth + 1)
-                elif entry.is_file(): 
+                elif entry.is_file():
                     yield entry
             except (PermissionError, OSError):
                 continue
+
     yield from _walk(root, 0)
 
-def discover_files(paths: Sequence[Path], patterns: Sequence[str], max_depth: int | None) -> list[Path]:
+
+def discover_files(
+    paths: Sequence[Path], patterns: Sequence[str], max_depth: int | None
+) -> list[Path]:
     """Discover all files to count from the given paths"""
 
     files: list[Path] = []
@@ -92,8 +115,11 @@ def discover_files(paths: Sequence[Path], patterns: Sequence[str], max_depth: in
         elif path.is_dir():
             files.extend(walk_directory(path, patterns, max_depth))
         else:
-            console.print(f"[yellow]Warning:[/yellow] '{path}' is not a file or directory, skipping")
+            console.print(
+                f"[yellow]Warning:[/yellow] '{path}' is not a file or directory, skipping"
+            )
     return files
+
 
 def is_binary(path: Path, chunk_size: int = 8192) -> bool:
     """Detect if a file is binary by checking for null bytes in the first chunk"""
@@ -105,13 +131,14 @@ def is_binary(path: Path, chunk_size: int = 8192) -> bool:
     except (OSError, PermissionError):
         return True
 
+
 def count_lines(path: Path) -> int | None:
     """Count lines in a file. Returns None if the file should be skipped"""
 
     try:
         if is_binary(path):
             return None
-        
+
         text = path.read_text(encoding="utf-8")
         if not text:
             return 0
@@ -125,12 +152,14 @@ def count_lines(path: Path) -> int | None:
     except (OSError, PermissionError):
         return None
 
+
 def get_group_name(path: Path, group_by_file: bool) -> str:
     if group_by_file:
         return path.name
     if path.suffix:
         return path.suffix
     return "(no extension)"
+
 
 def aggregate(results: list[CountResult], group_by_file: bool) -> list[GroupStats]:
     groups: dict[str, GroupStats] = {}
@@ -142,10 +171,13 @@ def aggregate(results: list[CountResult], group_by_file: bool) -> list[GroupStat
         groups[name].file_count += 1
     return sorted(groups.values(), key=lambda g: g.lines, reverse=True)
 
+
 ### OUTPUT FORMATTING
+
 
 def fmt(n: int) -> str:
     return f"{n:,}"
+
 
 def _bar_color(pct: float) -> str:
     if pct >= 25:
@@ -156,14 +188,22 @@ def _bar_color(pct: float) -> str:
         return "green"
     return "blue"
 
-def render_results(groups: list[GroupStats], total_lines: int, total_files: int, skipped: int):
+
+def render_results(
+    groups: list[GroupStats], total_lines: int, total_files: int, skipped: int
+):
     """Render the results as a Rich table"""
 
     if not groups:
         console.print("[yellow]No countable files found[/]")
         return
 
-    table = Table(title="[bold]Lines of Code[/]",show_header=True,header_style="bold cyan",border_style="bold white")
+    table = Table(
+        title="[bold]Lines of Code[/]",
+        show_header=True,
+        header_style="bold cyan",
+        border_style="bold white",
+    )
     table.add_column("Extension / File", style="bold white", no_wrap=True)
     table.add_column("Files", justify="right", style="cyan")
     table.add_column("Lines", justify="right", style="green")
@@ -174,11 +214,17 @@ def render_results(groups: list[GroupStats], total_lines: int, total_files: int,
 
     for group in groups:
         pct = (group.lines / total_lines * 100) if total_lines > 0 else 0.0
-        bar_len = int((group.lines / max_lines ) * 30) if max_lines > 0 else 0
+        bar_len = int((group.lines / max_lines) * 30) if max_lines > 0 else 0
         bar = "#" * bar_len
         color = _bar_color(pct)
 
-        table.add_row(group.name, fmt(group.file_count), fmt(group.lines), f"{pct:.1f}%", f"[{color}]{bar}[/]")
+        table.add_row(
+            group.name,
+            fmt(group.file_count),
+            fmt(group.lines),
+            f"{pct:.1f}%",
+            f"[{color}]{bar}[/]",
+        )
 
     table.add_section()
     table.add_row(
@@ -194,15 +240,23 @@ def render_results(groups: list[GroupStats], total_lines: int, total_files: int,
     if skipped > 0:
         console.print(f"\n[dim]{skipped} file(s) skipped (binary or unreadable)[/]")
 
+
 ### CLI
 
+
 @app.command()
-def main(paths: list[Path] | None = typer.Argument(None, help="Files/Directories to scan. Default: '.'"),
-         exclude: list[str] = typer.Option(None, "--exclude", "-e", help="Glob patterns to exclude"),
-         depth: int | None = typer.Option(None, "--depth", "-d", help="Max recursion depth")) -> None:
+def main(
+    paths: list[Path] | None = typer.Argument(
+        None, help="Files/Directories to scan. Default: '.'"
+    ),
+    exclude: list[str] = typer.Option(
+        None, "--exclude", "-e", help="Glob patterns to exclude"
+    ),
+    depth: int | None = typer.Option(None, "--depth", "-d", help="Max recursion depth"),
+) -> None:
     """Count lines of code in files and directories
     \b
-    Examples: 
+    Examples:
       locc                  # Scan current directory
       locc ~/projects       # Scan specific directory
       locc foo.py bar.py    # Count specific files
@@ -250,7 +304,7 @@ def main(paths: list[Path] | None = typer.Argument(None, help="Files/Directories
                     all_files.append(f)
                     progress.update(task, completed=len(all_files))
         progress.update(task, description="[green]Scan complete[/]")
-    
+
     if not all_files:
         console.print("[yellow]No files found to count[/]")
         raise typer.Exit(0)
@@ -284,6 +338,7 @@ def main(paths: list[Path] | None = typer.Argument(None, help="Files/Directories
     total_files = sum(g.file_count for g in groups)
 
     render_results(groups, total_lines, total_files, skipped)
+
 
 if __name__ == "__main__":
     app()

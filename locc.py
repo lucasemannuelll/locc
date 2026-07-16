@@ -192,3 +192,97 @@ def render_results(groups: list[GroupStats], total_lines: int, total_files: int,
 
     if skipped > 0:
         console.print(f"\n[dim]{skipped} file(s) skipped (binary or unreadable)[/]")
+
+### CLI
+
+@app.command()
+def main(paths: list[Path] | None = typer.Argument(None, help="Files/Directories to scan. Default: '.'"),
+         exclude: list[str] = typer.Option(None, "--exclude", "-e", help="Glob patterns to exclude"),
+         depth: int | None = typer.Option(None, "--depth", "-d", help="Max recursion depth")) -> None:
+    """Count lines of code in files and directories
+    \b
+    Examples: 
+      locc                  # Scan current directory
+      locc ~/projects       # Scan specific directory
+      locc foo.py bar.py    # Count specific files
+      locc -e '*.test.js'   # Exclude test files
+      locc -d 2             # Limit depth to 2
+    """
+
+    if not paths:
+        paths = [Path(".")]
+
+    if depth is not None and depth < 0:
+        console.print("[red]Error:[/] Depth must be non-negative integer")
+        raise typer.Exit(1)
+
+    valid_paths = []
+    for path in paths:
+        if path.exists():
+            valid_paths.append(path)
+        else:
+            console.print(f"[yellow]Warning:[/] '{path}' does not exist, skipping")
+    if not valid_paths:
+        console.print("[red]Error:[/] No valid paths to scan")
+        raise typer.Exit(1)
+
+    has_directory = any(path.is_dir() for path in valid_paths)
+    group_by_file = not has_directory
+
+    all_files = []
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("{task.completed} files"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("[cyan]Scanning...", total=None)
+
+        for path in valid_paths:
+            if path.is_file():
+                all_files.append(path)
+            elif path.is_dir():
+                for f in walk_directory(path, exclude or [], depth):
+                    all_files.append(f)
+                    progress.update(task, completed=len(all_files))
+        progress.update(task, description="[green]Scan complete[/]")
+    
+    if not all_files:
+        console.print("[yellow]No files found to count[/]")
+        raise typer.Exit(0)
+
+    results = []
+    skipped = 0
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("{task.completed} files"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("[cyan]Counting lines...", total=len(all_files))
+        for f in all_files:
+            count = count_lines(f)
+            if count is not None:
+                results.append(CountResult(path=f, line=count))
+            else:
+                skipped += 1
+            progress.update(task, advance=1)
+    if not results:
+        console.print("[yellow]No countable files found (binary or unreadable)[/]")
+        raise typer.Exit(0)
+
+    groups = aggregate(results, group_by_file)
+    total_lines = sum(g.lines for g in groups)
+    total_files = sum(g.file_count for g in groups)
+
+    render_results(groups, total_lines, total_lines, skipped)
+
+if __name__ == "__main__":
+    app()

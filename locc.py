@@ -154,6 +154,8 @@ def count_lines(path: Path) -> int | None:
 
 
 def get_group_name(path: Path, group_by_file: bool) -> str:
+    """Get the group name for a file"""
+
     if group_by_file:
         return path.name
     if path.suffix:
@@ -162,6 +164,8 @@ def get_group_name(path: Path, group_by_file: bool) -> str:
 
 
 def aggregate(results: list[CountResult], group_by_file: bool) -> list[GroupStats]:
+    """Aggregate count results by group, sorted by lines decending"""
+
     groups: dict[str, GroupStats] = {}
     for r in results:
         name = get_group_name(r.path, group_by_file)
@@ -176,17 +180,21 @@ def aggregate(results: list[CountResult], group_by_file: bool) -> list[GroupStat
 
 
 def fmt(n: int) -> str:
+    """Format a number with thousands separators"""
+
     return f"{n:,}"
 
 
 def _bar_color(pct: float) -> str:
+    """Pick a color for the visual bar based on percentage"""
+
     if pct >= 25:
-        return "red"
+        return "#d65d0e"  # orange - deepest/warmest
     if pct >= 10:
-        return "yellow"
+        return "#d79921"  # gold - medium
     if pct >= 5:
-        return "green"
-    return "blue"
+        return "#98971a"  # olive - subtle
+    return "#689d6a"  # green - lightest
 
 
 def render_results(
@@ -201,13 +209,13 @@ def render_results(
     table = Table(
         title="[bold]Lines of Code[/]",
         show_header=True,
-        header_style="bold cyan",
-        border_style="bold white",
+        header_style="bold #d79921",  # gruvbox gold
+        border_style="#665c54",  # gruvbox bg3 - subtle border
     )
-    table.add_column("Extension / File", style="bold white", no_wrap=True)
-    table.add_column("Files", justify="right", style="cyan")
-    table.add_column("Lines", justify="right", style="green")
-    table.add_column("%", justify="right", style="yellow")
+    table.add_column("Extension / File", style="#ebdbb2", no_wrap=True)  # gruvbox fg1
+    table.add_column("Files", justify="right", style="#83a598")  # gruvbox blue
+    table.add_column("Lines", justify="right", style="#b8bb26")  # gruvbox green
+    table.add_column("%", justify="right", style="#fabd2f")  # gruvbox yellow
     table.add_column("Distribution", ratio=1, min_width=20)
 
     max_lines = max(group.lines for group in groups)
@@ -228,9 +236,9 @@ def render_results(
 
     table.add_section()
     table.add_row(
-        "[bold white]Total[/]",
-        f"[bold cyan]{fmt(total_files)}[/]",
-        f"[bold green]{fmt(total_lines)}[/]",
+        f"[bold #ebdbb2]Total[/]",  # gruvbox fg1 bold
+        f"[bold #83a598]{fmt(total_files)}[/]",
+        f"[bold #b8bb26]{fmt(total_lines)}[/]",
         "",
     )
 
@@ -238,7 +246,9 @@ def render_results(
     console.print(table)
 
     if skipped > 0:
-        console.print(f"\n[dim]{skipped} file(s) skipped (binary or unreadable)[/]")
+        console.print(
+            f"\n[#a89984]{skipped} file(s) skipped (binary or unreadable)[/]"
+        )  # gruvbox fg4
 
 
 ### CLI
@@ -247,10 +257,10 @@ def render_results(
 @app.command()
 def main(
     paths: list[Path] | None = typer.Argument(
-        None, help="Files/Directories to scan. Default: '.'"
+        None, help="Files or directories to scan. Default to current directory"
     ),
     exclude: list[str] = typer.Option(
-        None, "--exclude", "-e", help="Glob patterns to exclude"
+        None, "--exclude", "-e", help="Glob patterns to exclude (e.g., '*lock*', 'vendor/'). Repeatable"
     ),
     depth: int | None = typer.Option(None, "--depth", "-d", help="Max recursion depth"),
 ) -> None:

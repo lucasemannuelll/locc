@@ -33,7 +33,7 @@ class CountResult:
 
 @dataclass
 class GroupStats:
-    """Aggregated stats for a group (extention or filename)"""
+    """Aggregated stats for a group (extension or filename)"""
     name: str
     lines: int
     file_count: int
@@ -130,7 +130,7 @@ def get_group_name(path: Path, group_by_file: bool) -> str:
         return path.name
     if path.suffix:
         return path.suffix
-    return "(no extention)"
+    return "(no extension)"
 
 def aggregate(results: list[CountResult], group_by_file: bool) -> list[GroupStats]:
     groups: dict[str, GroupStats] = {}
@@ -141,3 +141,54 @@ def aggregate(results: list[CountResult], group_by_file: bool) -> list[GroupStat
         groups[name].lines += r.lines
         groups[name].file_count += 1
     return sorted(groups.values(), key=lambda g: g.lines, reverse=True)
+
+### OUTPUT FORMATTING
+
+def fmt(n: int) -> str:
+    return f"{n:,}"
+
+def _bar_color(pct: float) -> str:
+    if pct >= 25:
+        return "red"
+    if pct >= 10:
+        return "yellow"
+    if pct >= 5:
+        return "green"
+    return "blue"
+
+def render_results(groups: list[GroupStats], total_lines: int, total_files: int, skipped: int):
+    """Render the results as a Rich table"""
+
+    if not groups:
+        console.print("[yellow]No countable files found[/]")
+        return
+
+    table = Table(title="[bold]Lines of Code[/]",show_header=True,header_style="bold cyan",border_style="bright white")
+    table.add_column("Extension / File", style="bold white", no_wrap=True)
+    table.add_column("Files", justify="right", style="cyan")
+    table.add_column("%", justify="right", style="yellow")
+    table.add_column("Distribution", ratio=1, min_width=20)
+
+    max_lines = max(group.lines for group in groups)
+
+    for group in groups:
+        pct = (group.lines / total_files * 100) if total_files > 0 else 0.0
+        bar_len = int((group.lines / max_lines ) * 30) if max_lines > 0 else 0
+        bar = "#" * bar_len
+        color = _bar_color(pct)
+
+        table.add_row(group.name, fmt(group.file_count), fmt(group.lines), f"{pct:.1f}%", f"[{color}]{bar}[/]")
+
+    table.add_section()
+    table.add_row(
+        "[bold white]Total[/]",
+        f"[bold cyan]{fmt(total_files)}[/]",
+        f"[bold green]{fmt(total_lines)}[/]",
+        "",
+    )
+
+    console.print()
+    console.print(table)
+
+    if skipped > 0:
+        console.print(f"\n[dim]{skipped} file(s) skipped (binary or unreadable)[/]")

@@ -10,7 +10,7 @@ from collections.abc import Iterator, Sequence
 
 import typer
 from rich.console import Console
-from rich.progress import (BarColumn, SpinnerColumn, TextColumn, TimeElapsedColumn)
+from rich.progress import (BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn)
 from rich.table import Table
 
 app = typer.Typer(name="locc", help="Count lines of code in files and directories", add_completion=False, no_args_is_help=False)
@@ -29,7 +29,7 @@ DEFAULT_EXCLUDED_DIRS = {
 class CountResult:
     """Result of counting a single file"""
     path: Path
-    line: int
+    lines: int
 
 @dataclass
 class GroupStats:
@@ -163,16 +163,17 @@ def render_results(groups: list[GroupStats], total_lines: int, total_files: int,
         console.print("[yellow]No countable files found[/]")
         return
 
-    table = Table(title="[bold]Lines of Code[/]",show_header=True,header_style="bold cyan",border_style="bright white")
+    table = Table(title="[bold]Lines of Code[/]",show_header=True,header_style="bold cyan",border_style="bold white")
     table.add_column("Extension / File", style="bold white", no_wrap=True)
     table.add_column("Files", justify="right", style="cyan")
+    table.add_column("Lines", justify="right", style="green")
     table.add_column("%", justify="right", style="yellow")
     table.add_column("Distribution", ratio=1, min_width=20)
 
     max_lines = max(group.lines for group in groups)
 
     for group in groups:
-        pct = (group.lines / total_files * 100) if total_files > 0 else 0.0
+        pct = (group.lines / total_lines * 100) if total_lines > 0 else 0.0
         bar_len = int((group.lines / max_lines ) * 30) if max_lines > 0 else 0
         bar = "#" * bar_len
         color = _bar_color(pct)
@@ -270,7 +271,7 @@ def main(paths: list[Path] | None = typer.Argument(None, help="Files/Directories
         for f in all_files:
             count = count_lines(f)
             if count is not None:
-                results.append(CountResult(path=f, line=count))
+                results.append(CountResult(path=f, lines=count))
             else:
                 skipped += 1
             progress.update(task, advance=1)
@@ -282,7 +283,7 @@ def main(paths: list[Path] | None = typer.Argument(None, help="Files/Directories
     total_lines = sum(g.lines for g in groups)
     total_files = sum(g.file_count for g in groups)
 
-    render_results(groups, total_lines, total_lines, skipped)
+    render_results(groups, total_lines, total_files, skipped)
 
 if __name__ == "__main__":
     app()

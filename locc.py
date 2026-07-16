@@ -15,3 +15,12 @@ from rich.table import Table
 
 app = typer.Typer(name="locc", help="Count lines of code in files and directories", add_completion=False, no_args_is_help=False)
 console = Console()
+
+DEFAULT_EXCLUDED_DIRS = {
+    "node_modules",
+    "__pycache__",
+    "target",
+    "build",
+    ".pytest_cache",
+    ".mypy_cache",
+}

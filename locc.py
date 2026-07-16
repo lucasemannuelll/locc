@@ -38,4 +38,61 @@ class GroupStats:
     lines: int
     file_count: int
 
+# FILE STUFF
 
+def is_excluded(name: str, patterns: Sequence[str]) -> bool:
+    """check if a file/dir name should be excluded based on defaults and patterns"""
+
+    if name.startswith("."):
+        return True
+    if name in DEFAULT_EXCLUDED_DIRS:
+        return True
+    
+    for pattern in patterns:
+        if pattern.endswith("/"):
+            if name == pattern.rstrip("/"):
+                return True
+        elif fnmatch.fnmatch(name, pattern):
+            return True
+    return False
+
+def walk_directory(root: Path, patterns: Sequence[str], max_depth: int | None) -> Iterator[Path]:
+    """Walk a directory yielding file paths, respecting exclusions and depth"""
+
+    def _walk(current: Path, depth: int) -> Iterator[Path]:
+        if max_depth is not None and depth > max_depth:
+            return
+        
+        try:
+            entries = sorted(current.iterdir())
+        except (PermissionError, OSError):
+            return
+
+        for entry in entries:
+            if is_excluded(entry.name, patterns):
+                continue
+            if entry.is_symlink():
+                continue
+            
+            try:
+                if entry.is_dir():
+                    yield from _walk(entry, depth + 1)
+                elif entry.is_file(): 
+                    yield entry
+            except (PermissionError, OSError):
+                continue
+    yield from _walk(root, 0)
+
+def discover_files(paths: Sequence[Path], patterns: Sequence[str], max_depth: int | None) -> list[Path]:
+    """Discover all files to count from the given paths"""
+
+    files: list[Path] = []
+
+    for path in paths:
+        if path.is_file():
+            files.append(path)
+        elif path.is_dir():
+            files.extend(walk_directory(path, patterns, max_depth))
+        else:
+            console.print(f"[yellow]Warning:[/yellow] '{path}' is not a file or directory, skipping")
+    return files

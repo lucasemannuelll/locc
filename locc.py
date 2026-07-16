@@ -24,3 +24,18 @@ DEFAULT_EXCLUDED_DIRS = {
     ".pytest_cache",
     ".mypy_cache",
 }
+
+@dataclass
+class CountResult:
+    """Result of counting a single file"""
+    path: Path
+    line: int
+
+@dataclass
+class GroupStats:
+    """Aggregated stats for a group (extention or filename)"""
+    name: str
+    lines: int
+    file_count: int
+
+

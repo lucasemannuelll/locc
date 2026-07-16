@@ -38,8 +38,6 @@ class GroupStats:
     lines: int
     file_count: int
 
-# FILE STUFF
-
 def is_excluded(name: str, patterns: Sequence[str]) -> bool:
     """check if a file/dir name should be excluded based on defaults and patterns"""
 
@@ -96,3 +94,50 @@ def discover_files(paths: Sequence[Path], patterns: Sequence[str], max_depth: in
         else:
             console.print(f"[yellow]Warning:[/yellow] '{path}' is not a file or directory, skipping")
     return files
+
+def is_binary(path: Path, chunk_size: int = 8192) -> bool:
+    """Detect if a file is binary by checking for null bytes in the first chunk"""
+
+    try:
+        with path.open("rb") as f:
+            chunk = f.read(chunk_size)
+        return b"\x00" in chunk
+    except (OSError, PermissionError):
+        return True
+
+def count_lines(path: Path) -> int | None:
+    """Count lines in a file. Returns None if the file should be skipped"""
+
+    try:
+        if is_binary(path):
+            return None
+        
+        text = path.read_text(encoding="utf-8")
+        if not text:
+            return 0
+
+        count = text.count("\n")
+        if not text.endswith("\n"):
+            count += 1
+        return count
+    except UnicodeDecodeError:
+        return None
+    except (OSError, PermissionError):
+        return None
+
+def get_group_name(path: Path, group_by_file: bool) -> str:
+    if group_by_file:
+        return path.name
+    if path.suffix:
+        return path.suffix
+    return "(no extention)"
+
+def aggregate(results: list[CountResult], group_by_file: bool) -> list[GroupStats]:
+    groups: dict[str, GroupStats] = {}
+    for r in results:
+        name = get_group_name(r.path, group_by_file)
+        if name not in groups:
+            groups[name] = GroupStats(name=name, lines=0, file_count=0)
+        groups[name].lines += r.lines
+        groups[name].file_count += 1
+    return sorted(groups.values(), key=lambda g: g.lines, reverse=True)

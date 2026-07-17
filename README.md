@@ -1,29 +1,126 @@
-# `locc` - Lines of Code Counter
+# LOC Counter (locc)
 
-A fast, beautiful command-line tool for counting lines of code in files and directories. 
+A fast, beautiful lines of code counter with rich terminal output and smart filtering.
 
-## What It Does
+## Features
 
-`locc` scans your files and directories to provide a clear, visual breakdown of your codebase. Instead of a raw wall of text, it outputs a beautifully formatted, color-coded table showing exactly where your lines of code live.
+- **Rich terminal output** with color-coded distribution bars
+- **Smart file detection** - automatically skips binary files
+- **Default exclusions** for common directories (`node_modules`, `__pycache__`, etc.)
+- **Flexible filtering** with glob patterns
+- **Depth limiting** for directory traversal
+- **Aggregated statistics** by file extension (or filename)
+- **Progress indicators** for long-running scans
+- **Gruvbox-inspired color scheme** for readability
 
-### Key Features
+## Installation
 
-*   **Simple Counting:** Counts all lines in a file (including blanks and comments), similar to `wc -l`.
-*   **Smart Exclusions:** Automatically ignores dotfiles, dot directories (`.git`, `.venv`), and common dependency/build folders (`node_modules/`, `__pycache__/`, `build/`, `dist/`, etc.).
-*   **Binary Detection:** Automatically skips binary files by checking for null-bytes and catching decode errors, ensuring your counts stay clean.
-*   **Intelligent Grouping:** 
-    *   When scanning directories, results are grouped by file extension (`.py`, `.js`, `.c`).
-    *   When passing specific files, results are grouped by individual filenames.
-    *   Files with no extension are grouped into `(no extension)`.
-*   **Rich Visual Output:** Displays a formatted table using the Rich library, showing file counts, total lines, percentages, and distribution bars. Results are sorted by highest line count.
-*   **Progress Indicators:** Displays transient progress bars while scanning and counting large directories so you always know what's happening.
-*   **Resilient:** Gracefully skips files and directories with permission errors without crashing the whole scan.
+### From Source
 
-### Customization Options
+```bash
+# Clone the repository
+git clone <repository-url>
+cd locc
 
-*   **Custom Exclusions:** Add your own glob patterns to exclude specific files or directories (e.g., ignore `*.test.js` or `tests/`).
-*   **Depth Limiting:** Restrict how deep the tool recurses into subdirectories (e.g., only scan the top-level folder, or limit to 3 levels deep).
+# Install in development mode
+pip install -e .
+```
+
+### Direct Usage
+
+If you prefer not to install, you can run directly:
+
+```bash
+python locc.py [options]
+```
+
+### Dependencies
+
+- **rich** >= 13.0.0 - Terminal formatting
+- **typer** >= 0.9.0 - CLI framework
+
+These will be installed automatically when you run `pip install -e .`.
+
+## Usage
+
+### Basic Examples
+
+```bash
+# Scan current directory
+locc
+
+# Scan specific directory
+locc ~/projects
+
+# Scan specific files
+locc foo.py bar.py
+
+# Exclude test files
+locc -e '*.test.js'
+
+# Multiple exclusion patterns
+locc -e '*.lock' -e 'vendor/'
+
+# Limit depth to 2 levels
+locc -d 2
+
+# Combine options
+locc ~/src -e '*.pyc' -e '__pycache__/' -d 3
+```
+
+### Options
+
+| Option          | Description                                               |
+|-----------------|-----------------------------------------------------------|
+| `paths`         | Files or directories to scan (default: current directory) |
+| `-e, --exclude` | Glob patterns to exclude (repeatable)                     |
+| `-d, --depth`   | Maximum recursion depth                                   |
+
+### Default Exclusions
+
+The tool automatically excludes these directories:
+- `node_modules`
+- `__pycache__`
+- `target`
+- `build`
+- `.pytest_cache`
+- `.mypy_cache`
+- All hidden directories/files (starting with `.`)
+
+## Output Example
+
+```
+════════════════════════════════════════════════════════════════
+                    Lines of Code                     
+════════════════════════════════════════════════════════════════
+Extension / File  Files  Lines     %  Distribution             
+────────────────────────────────────────────────────────────────
+.py                  12    2,450  45.2%  ######################
+.js                   8    1,200  22.1%  ###########           
+.go                   5      890  16.4%  #########             
+.rs                   3      450   8.3%  ####                   
+(no extension)        2      180   3.3%  ##                     
+.md                   4      144   2.7%  #                      
+.yml                  3       60   1.1%                          
+────────────────────────────────────────────────────────────────
+Total                37    5,374                                
+
+5 file(s) skipped (binary or unreadable)
+```
+
+## Technical Details
+
+- **Binary detection**: Checks for null bytes in first 8KB of file
+- **Encoding**: UTF-8 only (skips files with encoding errors)
+- **Line counting**: Counts newline characters, adds 1 if file doesn't end with newline
+- **Symlinks**: Skipped for safety
+- **Performance**: Uses streaming reads with configurable chunk sizes
 
 ---
 
-*(Installation and usage examples to be added)*
+## Why locc?
+
+- **Fast**: Optimized for large codebases
+- **Beautiful**: Color-coded output makes results easy to read
+- **Practical**: Smart defaults with flexible customization
+- **Single file**: Easy to copy and use anywhere

@@ -24,5 +24,5 @@ dependencies = [
 locc = "locc:app"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/locc"
-Repository = "https://github.com/yourusername/locc"
+Homepage = "https://github.com/lucasemannuelll/locc"
+Repository = "https://github.com/lucasemannuelll/locc"
